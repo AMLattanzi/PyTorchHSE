@@ -59,7 +59,7 @@ def NewtonIter (k, m_tol, RdOCp, dz,
 # Inputs
 z  = np.linspace(0.0,10000.0,num=256)
 Qv = np.zeros(256)
-Theta = np.linspace(200.0,500.0,num=4)
+Theta = np.linspace(200.0,500.0,num=10)
 
 # Outputs
 R = np.zeros(256)
@@ -69,6 +69,7 @@ P = np.zeros(256)
 #------------------------------------
 df_out = pd.DataFrame(columns=['Pressure', 'Density'])
 df_in  = pd.DataFrame(columns=['Height'  , 'Theta'])
+df_all = pd.DataFrame(columns=['Theta' , 'Height', 'Pressure', 'Density']) 
 for i in range(Theta.shape[0]) :
 
     Th = Theta[i]
@@ -100,12 +101,17 @@ for i in range(Theta.shape[0]) :
     # Concatenate the DataFrame with new HSE
     Ptmp = np.array(P)
     Rtmp = np.array(R)
-    data_out = {'Pressure': Ptmp, 'Density' : Rtmp}
-    data_in  = {'Height'  : z, 'Theta'   : np.ones(256)*Th}
-    df_out = pd.concat([df_out,pd.DataFrame([data_out])], ignore_index=True)
-    df_in  = pd.concat([df_in,pd.DataFrame([data_in])], ignore_index=True)
-
+    data_out = {'Pressure': Ptmp           , 'Density' : Rtmp}
+    data_in  = {'Theta'   : np.ones(256)*Th, 'Height'  : z   }
+    data_all = {'Theta'   : np.ones(256)*Th, 'Height'  : z,
+                'Pressure': Ptmp           , 'Density' : Rtmp}
+    df_out = pd.concat([df_out,pd.DataFrame(data_out)], ignore_index=True)
+    df_in  = pd.concat([df_in,pd.DataFrame(data_in)]  , ignore_index=True)
+    df_all = pd.concat([df_all,pd.DataFrame(data_all)], ignore_index=True)
+    
 # Write the data to CSV
 df_out.to_csv('Pressure_Density.csv')
 df_in.to_csv('Height_Theta.csv')
+df_all.to_csv('ERF_HSE.csv')
+
 
