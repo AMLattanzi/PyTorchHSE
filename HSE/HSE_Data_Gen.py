@@ -57,13 +57,15 @@ def NewtonIter (k, m_tol, RdOCp, dz,
 # Build HSE
 #====================================
 # Inputs
-z  = np.linspace(0.0,10000.0,num=256)
-Qv = np.zeros(256)
-Theta = np.linspace(200.0,500.0,num=10)
+nz = 128
+nt = 128
+z  = np.linspace(0.0,10000.0,num=nz)
+Qv = np.zeros(nz)
+Theta = np.linspace(200.0,500.0,num=nt)
 
 # Outputs
-R = np.zeros(256)
-P = np.zeros(256)
+R = np.zeros(nz)
+P = np.zeros(nz)
 
 # Begin main driver
 #------------------------------------
@@ -102,8 +104,8 @@ for i in range(Theta.shape[0]) :
     Ptmp = np.array(P)
     Rtmp = np.array(R)
     data_out = {'Pressure': Ptmp           , 'Density' : Rtmp}
-    data_in  = {'Theta'   : np.ones(256)*Th, 'Height'  : z   }
-    data_all = {'Theta'   : np.ones(256)*Th, 'Height'  : z,
+    data_in  = {'Theta'   : np.ones(nz)*Th, 'Height'  : z   }
+    data_all = {'Theta'   : np.ones(nz)*Th, 'Height'  : z,
                 'Pressure': Ptmp           , 'Density' : Rtmp}
     df_out = pd.concat([df_out,pd.DataFrame(data_out)], ignore_index=True)
     df_in  = pd.concat([df_in,pd.DataFrame(data_in)]  , ignore_index=True)
