@@ -9,19 +9,22 @@ from accelerate import Accelerator
 
 train_model = True
 test_model  = True
+n_input     = 2
+n_output    = 2
+layer_width = 64
 
 #====================================
 # Define the NN
 #====================================
 class NeuralNet(nn.Module):
-    def __init__(self):
+    def __init__(self,n_in,n_out,width):
         super(NeuralNet, self).__init__()
         self.model = nn.Sequential(
-            nn.Linear(2, 64),
+            nn.Linear(n_in, width),
             nn.ReLU(),
-            nn.Linear(64, 64),
+            nn.Linear(width, width),
             nn.ReLU(),
-            nn.Linear(64, 2)
+            nn.Linear(width, n_out)
         )
 
     def forward(self, x):
@@ -56,14 +59,14 @@ if (train_model) :
     Y_test  = torch.tensor(Y_test , dtype=torch.float32)
     
     # Construct model
-    net = NeuralNet()
+    net = NeuralNet(n_input,n_output,layer_width)
 
     # Train the model
     #------------------------------------
     criterion = nn.MSELoss()
     optimizer = optim.Adam(net.parameters(), lr=0.001)
 
-    epochs = 5000
+    epochs = 1000
     for epoch in range(epochs):
         net.train()
         
@@ -86,7 +89,7 @@ if (train_model) :
 if (train_model or test_model) :
     # Load the model
     #------------------------------------
-    net = NeuralNet()
+    net = NeuralNet(n_input,n_output,layer_width)
     net.load_state_dict(torch.load("HSE_NN.pth", weights_only=True))
 
     # Evaluate the model
@@ -102,7 +105,7 @@ if (train_model or test_model) :
         for col in range(X_test.shape[0]) :
             Theta = X[col,0]
             Zval  = X[col,1]
-            if ((Theta>300 and Theta<400) and (Zval<1000.0)) :
+            if ((Theta>325 and Theta<375) and (Zval<1000.0)) :
                 print(f"[Th, Z] input : {X_test[col,:].numpy()}")
                 print(f"[P, Rho] Model: {pred_scale[col,:]}")
                 print(f"[P, Rho] Data : {Y[col,:]}")
