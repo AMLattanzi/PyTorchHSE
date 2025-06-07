@@ -7,14 +7,15 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from accelerate import Accelerator
 
-train_model = True
+train_model = False
 test_model  = True
 n_input     = 1
+n_output    = n_var*n_col
 n_col       = 128
 n_var       = 2
-n_output    = n_var*n_col
+n_test      = n_col//2 
 layer_width = 64
-m_tol       = 0.0001
+m_tol       = np.finfo(np.float32).eps
 
 #====================================
 # Define the NN
@@ -35,6 +36,27 @@ class NeuralNet(nn.Module):
         return (x.view(-1, n_col, n_var))
 
 #====================================
+# Define custom scaling
+#====================================
+def minmax_scale(ten,scal_ten) :
+    min_val = torch.zeros(ten.shape[0],ten.shape[2])
+    max_val = torch.zeros(ten.shape[0],ten.shape[2])
+    for i in range(ten.shape[0]) :
+        for n in range(ten.shape[2]) :
+            min_val[i,n] = ten[i,:,n].min()
+            max_val[i,n] = ten[i,:,n].max()
+            scal_ten[i,:,n] = (ten[i,:,n] - min_val[i,n]) / (max_val[i,n] -  min_val[i,n])
+
+def minmax_iscale(ten,scal_ten) :
+    min_val = torch.zeros(ten.shape[0],ten.shape[2])
+    max_val = torch.zeros(ten.shape[0],ten.shape[2])
+    for i in range(ten.shape[0]) :
+        for n in range(ten.shape[2]) :
+            min_val[i,n] = ten[i,:,n].min()
+            max_val[i,n] = ten[i,:,n].max()
+            scal_ten[i,:,n] = scal_ten[i,:,n] * (max_val[i,n] -  min_val[i,n]) + min_val[i,n]
+            
+#====================================
 # Always load the data
 #====================================
 fname = 'ERF_HSE.csv'
@@ -47,23 +69,23 @@ X = X.reshape(n_col,n_col)
 X = X[:,0]
 X = X.reshape(-1,1)
 Y = df[['Pressure', 'Density']].values  # shape: (N, 2)
-X_test  = torch.tensor(X, dtype=torch.float32)
-Y_test  = torch.tensor(Y, dtype=torch.float32)
+Y_ten = torch.tensor(Y.reshape(n_col,n_col,n_var), dtype=torch.float32)
 
+# Scale training data
+scalerx = MinMaxScaler()
+X_tmp   = scalerx.fit_transform(X)
+X_train = torch.tensor(X_tmp, dtype=torch.float32)
+Y_train = torch.tensor(Y_ten, dtype=torch.float32)
+minmax_scale(Y_ten,Y_train)
+
+# Set up testing data
+Xtmp   = scalerx.fit_transform(X)
+X_test = torch.tensor(Xtmp, dtype=torch.float32)
+    
 #====================================
 # Work to be done
 #====================================
 if (train_model) :
-    
-    # Scale data
-    scaler  = MinMaxScaler()
-    Y_tmp   = scaler.fit_transform(Y_test)
-    Y_tmp   = Y_tmp.reshape(n_col, n_col, n_var)
-    Y_train = torch.tensor(Y_tmp, dtype=torch.float32)
-    
-    # Convert to PyTorch tensors
-    X_train = X_test.clone()
-
     # Construct model
     net = NeuralNet(n_input,n_output,layer_width)
 
@@ -79,18 +101,19 @@ if (train_model) :
         # Compute prediction error
         pred = net(X_train)
         loss = criterion(pred, Y_train)
-
+            
         # Backpropagation
         loss.backward()
         optimizer.step()
         optimizer.zero_grad()
-        
-        if epoch % 100 == 0:
-            print(f"Epoch {epoch}, Loss: {loss.item():.4f}")
-
+            
+        # Break if at machine precision
         if (loss.item() < m_tol) :
-            print(f"Breaking at Epoch {epoch}, Loss: {loss.item():.4f}")
+            print(f"Breaking at Epoch: {epoch} with  Loss: {loss.item():.3e}")
             break
+            
+        if (epoch % 100 == 0) :
+            print(f"Epoch {epoch}, Loss: {loss.item():.3e}")
             
     # Save the model
     #------------------------------------
@@ -105,29 +128,13 @@ if (train_model or test_model) :
     # Evaluate the model
     #------------------------------------
     net.eval()
-    
-    # Test single theta
-    Theta_test = 200.0
-    X2 = np.array([200.0])
-    X2 = X2.reshape(-1,1)
-    X_test  = torch.tensor(X2, dtype=torch.float32)
-
-    # Test all theta
-    #X_test  = torch.tensor(X, dtype=torch.float32)
-    
-    Y_test  = torch.tensor(Y, dtype=torch.float32)
-    scaler  = MinMaxScaler()
-    scaler.fit_transform(Y_test)
     with torch.no_grad():
         predictions = net(X_test)
-        pred_scale  = scaler.inverse_transform(predictions.reshape(n_col,n_var))
-        pred_scale  = pred_scale.reshape(n_col, n_var)
-        
-        #pred_scale  = scaler.inverse_transform(predictions.reshape(n_col*n_col,n_var))
-        #pred_scale  = pred_scale.reshape(n_col, n_col, n_var)
-        
+        minmax_iscale(Y_test_tmp,predictions)
+        input_scale = scalerx.inverse_transform(X_test)
+        Theta_test  = input_scale[n_test]
         for col in range(n_col) :
-            print(f"[Th, k] input : {X_test}, {col}")
-            print(f"[P, Rho] Model: {pred_scale[col,:]}")
-            print(f"[P, Rho] Data : {Y[col,:]}")
+            print(f"[Th, k] input : {Theta_test}, {col}")
+            print(f"[P, Rho] Model: {predictions[n_test,col,:]}")
+            print(f"[P, Rho] Data : {Y_test_tmp[n_test,col,:]}")
             print(" ")
