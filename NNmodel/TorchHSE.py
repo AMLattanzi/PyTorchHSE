@@ -7,7 +7,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from accelerate import Accelerator
 
-train_model = False
+train_model = True
 test_model  = True
 n_input     = 2
 n_output    = 2
@@ -15,7 +15,7 @@ n_col       = 128
 n_var       = 2
 n_test      = n_col//2 
 layer_width = 64
-m_tol       = np.finfo(np.float32).eps
+m_tol       = 1.0e-6
 
 #====================================
 # Define the NN
@@ -65,8 +65,8 @@ df    = pd.read_csv(path + fname)
 # Extract inputs and targets
 X = df[['Theta', 'Height']].values      # shape: (N, 2)
 Y = df[['Pressure', 'Density']].values  # shape: (N, 2)
-X_ten = torch.tensor(X, dtype=torch.float32)
-Y_ten = torch.tensor(Y, dtype=torch.float32)
+X_ten = torch.tensor(X, dtype=torch.float64)
+Y_ten = torch.tensor(Y, dtype=torch.float64)
 
 # Split into train/test
 X_train = X_ten.clone()
@@ -79,9 +79,9 @@ Y_test_tmp  = Y_ten.clone()
 # Scale data
 scalerx = MinMaxScaler()
 X_train = scalerx.fit_transform(X_train)
-X_train = torch.tensor(X_train, dtype=torch.float32)
+X_train = torch.tensor(X_train, dtype=torch.float64)
 X_test  = scalerx.fit_transform(X_test)
-X_test  = torch.tensor(X_test, dtype=torch.float32)
+X_test  = torch.tensor(X_test, dtype=torch.float64)
 
 Y_train_tmp = Y_train_tmp.reshape(n_col, n_col, n_var)
 Y_test_tmp  = Y_test_tmp.reshape(n_col, n_col, n_var)
@@ -98,6 +98,7 @@ Y_test  = Y_test.reshape(-1,n_var)
 if (train_model) :
     # Construct model
     net = NeuralNet(n_input,n_output,layer_width)
+    net.double()
 
     # Train the model
     #------------------------------------
@@ -124,14 +125,20 @@ if (train_model) :
             print(f"Breaking at Epoch {epoch}, Loss: {loss.item():.3e}")
             break
             
-    # Save the model
+    # Save the model for internal testing
     #------------------------------------
     torch.save(net.state_dict(), "HSE_NN.pth")
+
+    # Save the model for C++ application
+    #------------------------------------
+    scripted_model = torch.jit.script(net)
+    scripted_model.save("HSE_NN.pt")
 
 if (train_model or test_model) :
     # Load the model
     #------------------------------------
     net = NeuralNet(n_input,n_output,layer_width)
+    net.double()
     net.load_state_dict(torch.load("HSE_NN.pth", weights_only=True))
 
     # Evaluate the model

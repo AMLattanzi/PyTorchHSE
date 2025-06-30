@@ -116,4 +116,16 @@ df_out.to_csv('Pressure_Density.csv')
 df_in.to_csv('Height_Theta.csv')
 df_all.to_csv('ERF_HSE.csv')
 
+# Write min/max rho for unscaling model
+rho = df_all['Density'].to_numpy()
+rho = rho.reshape(128,-1)
+rho_min = np.min(rho,axis=1)
+rho_max = np.max(rho,axis=1)
+with open("HSE_NN_Unscale.bin", "wb") as f:
+    Theta.tofile(f)
+    z.tofile(f)
+    rho_min.tofile(f)
+    rho_max.tofile(f)
+    
+
 
